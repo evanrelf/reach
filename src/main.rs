@@ -252,13 +252,14 @@ fn sqlite_migrate(sqlite: &mut Connection) -> anyhow::Result<()> {
     // SQLite's 12-step generalized `alter table` procedure:
     // https://www.sqlite.org/lang_altertable.html#otheralter
 
-    const LATEST_VERSION: u16 = 1;
+    const LATEST_VERSION: u16 = 2;
 
     loop {
         let user_version: u16 = sqlite.query_row("pragma user_version", [], |row| row.get(0))?;
 
         match user_version {
             0 => sqlite_migrate_0(sqlite)?,
+            1 => sqlite_migrate_1(sqlite)?,
             LATEST_VERSION => break,
             _ => anyhow::bail!(
                 "Database version {user_version} is newer than supported (max: {LATEST_VERSION})"
@@ -303,6 +304,36 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
+// Rewrite timestamps with fixed precision so they sort correctly as strings
+fn sqlite_migrate_1(sqlite: &mut Connection) -> anyhow::Result<()> {
+    let tx = sqlite.transaction()?;
+
+    let user_version: u16 = tx.query_row("pragma user_version;", [], |row| row.get(0))?;
+
+    assert_eq!(user_version, 1);
+
+    let rows = tx
+        .prepare("select rowid, time from file_events")?
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    {
+        let mut stmt = tx.prepare("update file_events set time = ?2 where rowid = ?1")?;
+        for (rowid, time) in rows {
+            let time: Timestamp = time.parse()?;
+            stmt.execute(params![rowid, sql_timestamp(&time)])?;
+        }
+    }
+
+    tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
+
+    tx.commit()?;
+
+    Ok(())
+}
+
 fn sqlite_finish(sqlite: &Connection) -> anyhow::Result<()> {
     sqlite.execute(
         "
@@ -312,6 +343,11 @@ fn sqlite_finish(sqlite: &Connection) -> anyhow::Result<()> {
     )?;
 
     Ok(())
+}
+
+// Fixed nanosecond precision, so lexicographic order matches chronological order
+fn sql_timestamp(time: &Timestamp) -> String {
+    format!("{time:.9}")
 }
 
 fn repo() -> anyhow::Result<Utf8PathBuf> {
@@ -424,7 +460,7 @@ fn record(
             repo.as_str(),
             path.as_str(),
             cwd.as_str(),
-            time.to_string(),
+            sql_timestamp(time),
             event.as_str(),
             session
         ],
@@ -451,7 +487,7 @@ fn frecent(
         ",
     )?;
 
-    let rows = stmt.query_map(params![repo.as_str(), time.to_string()], |row| {
+    let rows = stmt.query_map(params![repo.as_str(), sql_timestamp(time)], |row| {
         let path: String = row.get(0)?;
         let age_days: f64 = row.get(1)?;
         Ok((path, age_days))
@@ -496,7 +532,7 @@ fn recent(
     )?;
 
     let rows = stmt
-        .query_map(params![repo.as_str(), time.to_string()], |row| {
+        .query_map(params![repo.as_str(), sql_timestamp(time)], |row| {
             row.get::<_, String>(0)
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -527,7 +563,7 @@ fn frequent(
     )?;
 
     let rows = stmt
-        .query_map(params![repo.as_str(), time.to_string()], |row| {
+        .query_map(params![repo.as_str(), sql_timestamp(time)], |row| {
             row.get::<_, String>(0)
         })?
         .collect::<Result<Vec<_>, _>>()?;
