@@ -145,20 +145,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
-name = "empath"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "camino",
- "clap",
- "etcetera",
- "jiff",
- "parse_datetime",
- "pathdiff",
- "rusqlite",
-]
-
-[[package]]
 name = "etcetera"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -376,6 +362,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a338cc41d27e6cc6dce6cefc13a0729dfbb81c262b1f519331575dd80ef3067f"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "reach"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "clap",
+ "etcetera",
+ "jiff",
+ "parse_datetime",
+ "pathdiff",
+ "rusqlite",
 ]
 
 [[package]]

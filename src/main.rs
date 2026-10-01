@@ -22,7 +22,7 @@ struct Args {
     repo: Option<Utf8PathBuf>,
 
     /// Path to database
-    #[arg(long, env = "EMPATH_DB", value_name = "PATH")]
+    #[arg(long, env = "REACH_DB", value_name = "PATH")]
     db: Option<Utf8PathBuf>,
 
     #[command(subcommand)]
@@ -227,7 +227,7 @@ fn db_path() -> anyhow::Result<Utf8PathBuf> {
     let xdg = Xdg::new(AppStrategyArgs {
         top_level_domain: String::from("com"),
         author: String::from("Evan Relf"),
-        app_name: String::from("Empath"),
+        app_name: String::from("Reach"),
     })?;
     let state_dir = Utf8PathBuf::try_from(xdg.state_dir().unwrap())?;
     fs::create_dir_all(&state_dir)?;
@@ -289,7 +289,7 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        create table if not exists empath (
+        create table if not exists reach (
             repo text not null,
             path text not null,
             time text not null,
@@ -316,7 +316,7 @@ fn sqlite_migrate_1(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        create table new_empath (
+        create table new_reach (
             repo text not null,
             path text not null,
             time text not null,
@@ -326,11 +326,11 @@ fn sqlite_migrate_1(sqlite: &mut Connection) -> anyhow::Result<()> {
         [],
     )?;
 
-    tx.execute("insert into new_empath select * from empath;", [])?;
+    tx.execute("insert into new_reach select * from reach;", [])?;
 
-    tx.execute("drop table empath;", [])?;
+    tx.execute("drop table reach;", [])?;
 
-    tx.execute("alter table new_empath rename to empath;", [])?;
+    tx.execute("alter table new_reach rename to reach;", [])?;
 
     tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
 
@@ -351,7 +351,7 @@ fn sqlite_migrate_2(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        create table new_empath (
+        create table new_reach (
             repo text not null,
             path text not null,
             cwd text not null,
@@ -364,20 +364,20 @@ fn sqlite_migrate_2(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        insert into new_empath
+        insert into new_reach
         select
             repo,
             path,
             repo as cwd,
             time
-        from empath;
+        from reach;
         ",
         [],
     )?;
 
-    tx.execute("drop table empath;", [])?;
+    tx.execute("drop table reach;", [])?;
 
-    tx.execute("alter table new_empath rename to empath;", [])?;
+    tx.execute("alter table new_reach rename to reach;", [])?;
 
     tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
 
@@ -401,7 +401,7 @@ fn sqlite_migrate_3(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        create table new_empath (
+        create table new_reach (
             repo text not null,
             path text not null,
             cwd text not null,
@@ -414,24 +414,24 @@ fn sqlite_migrate_3(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        insert into new_empath
+        insert into new_reach
         select
             repo,
             path,
             cwd,
             time,
             null as event
-        from empath;
+        from reach;
         ",
         [],
     )?;
 
-    tx.execute("drop table empath;", [])?;
+    tx.execute("drop table reach;", [])?;
 
-    tx.execute("alter table new_empath rename to empath;", [])?;
+    tx.execute("alter table new_reach rename to reach;", [])?;
 
     tx.execute(
-        "create index empath_repo_time_path on empath (repo, time, path);",
+        "create index reach_repo_time_path on reach (repo, time, path);",
         [],
     )?;
 
@@ -452,7 +452,7 @@ fn sqlite_migrate_4(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     assert_eq!(user_version, 4);
 
-    tx.execute("alter table empath add column session text;", [])?;
+    tx.execute("alter table reach add column session text;", [])?;
 
     tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
 
@@ -575,7 +575,7 @@ fn record(
 ) -> anyhow::Result<()> {
     sqlite.execute(
         "
-        insert into empath (repo, path, cwd, time, event, session)
+        insert into reach (repo, path, cwd, time, event, session)
         values (?1, ?2, ?3, ?4, ?5, ?6)
         ",
         params![
@@ -602,7 +602,7 @@ fn frecent(
         select
             path,
             julianday(?2) - julianday(time) as age_days
-        from empath
+        from reach
         where repo = ?1
           and time <= ?2
           and (event is null or event = 'open')
@@ -645,7 +645,7 @@ fn recent(
     let mut stmt = sqlite.prepare(
         "
         select path
-        from empath
+        from reach
         where repo = ?1
           and time <= ?2
         group by path
@@ -675,7 +675,7 @@ fn frequent(
     let mut stmt = sqlite.prepare(
         "
         select path
-        from empath
+        from reach
         where repo = ?1
           and time <= ?2
           and (event is null or event = 'open')

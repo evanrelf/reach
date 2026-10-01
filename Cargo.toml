@@ -1,6 +1,5 @@
 [package]
-name = "empath"
-version = "0.1.0"
+name = "reach"
 edition = "2024"
 
 [dependencies]
