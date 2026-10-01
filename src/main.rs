@@ -285,7 +285,7 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
 
     tx.execute(
         "
-        create table if not exists reach (
+        create table if not exists file_events (
             repo text not null,
             path text not null,
             cwd text not null,
@@ -298,7 +298,7 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
     )?;
 
     tx.execute(
-        "create index if not exists reach_repo_time_path on reach (repo, time, path);",
+        "create index if not exists reach_repo_time_path on file_events (repo, time, path);",
         [],
     )?;
 
@@ -423,7 +423,7 @@ fn record(
 ) -> anyhow::Result<()> {
     sqlite.execute(
         "
-        insert into reach (repo, path, cwd, time, event, session)
+        insert into file_events (repo, path, cwd, time, event, session)
         values (?1, ?2, ?3, ?4, ?5, ?6)
         ",
         params![
@@ -450,7 +450,7 @@ fn frecent(
         select
             path,
             julianday(?2) - julianday(time) as age_days
-        from reach
+        from file_events
         where repo = ?1
           and time <= ?2
           and (event is null or event = 'open')
@@ -493,7 +493,7 @@ fn recent(
     let mut stmt = sqlite.prepare(
         "
         select path
-        from reach
+        from file_events
         where repo = ?1
           and time <= ?2
         group by path
@@ -523,7 +523,7 @@ fn frequent(
     let mut stmt = sqlite.prepare(
         "
         select path
-        from reach
+        from file_events
         where repo = ?1
           and time <= ?2
           and (event is null or event = 'open')
