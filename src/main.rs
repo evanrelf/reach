@@ -4,7 +4,7 @@ use etcetera::app_strategy::{AppStrategy as _, AppStrategyArgs, Xdg};
 use jiff::Timestamp;
 use parse_datetime::parse_datetime;
 use pathdiff::diff_utf8_paths;
-use rusqlite::{Connection, ToSql, params, types::ToSqlOutput};
+use rusqlite::{Connection, params};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -100,12 +100,6 @@ impl EventKind {
             EventKind::Open => "open",
             EventKind::Close => "close",
         }
-    }
-}
-
-impl ToSql for EventKind {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.as_str()))
     }
 }
 
@@ -429,7 +423,7 @@ fn record(
             path.as_str(),
             cwd.as_str(),
             time.to_string(),
-            event,
+            event.as_str(),
             session
         ],
     )?;
