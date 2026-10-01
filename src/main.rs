@@ -6,7 +6,6 @@ use parse_datetime::parse_datetime;
 use pathdiff::diff_utf8_paths;
 use rusqlite::{Connection, params};
 use std::{
-    cmp::Ordering,
     collections::{HashMap, HashSet},
     env, fs,
     io::{self, Read as _, Write},
@@ -484,6 +483,7 @@ fn frecent(
         where repo = ?1
           and time <= ?2
           and (event is null or event = 'open')
+        order by time
         ",
     )?;
 
@@ -505,7 +505,7 @@ fn frecent(
 
     let mut items = scores.into_iter().collect::<Vec<_>>();
 
-    items.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+    items.sort_by(|(path_a, a), (path_b, b)| b.total_cmp(a).then_with(|| path_a.cmp(path_b)));
 
     let paths = items
         .into_iter()
@@ -527,7 +527,7 @@ fn recent(
         where repo = ?1
           and time <= ?2
         group by path
-        order by max(time) desc
+        order by max(time) desc, path
         ",
     )?;
 
@@ -558,7 +558,7 @@ fn frequent(
           and time <= ?2
           and (event is null or event = 'open')
         group by path
-        order by count(*) desc
+        order by count(*) desc, path
         ",
     )?;
 
