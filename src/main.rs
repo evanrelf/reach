@@ -227,7 +227,9 @@ fn db_path() -> anyhow::Result<Utf8PathBuf> {
 }
 
 fn parse_timestamp(input: &str) -> anyhow::Result<Timestamp> {
-    let zoned = parse_datetime(input)?;
+    let Some(zoned) = parse_datetime(input)?.into_zoned() else {
+        anyhow::bail!("Unsupported year in timestamp (out of range)");
+    };
     Ok(zoned.timestamp())
 }
 
