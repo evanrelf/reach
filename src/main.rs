@@ -258,17 +258,13 @@ fn sqlite_migrate(sqlite: &mut Connection) -> anyhow::Result<()> {
     // SQLite's 12-step generalized `alter table` procedure:
     // https://www.sqlite.org/lang_altertable.html#otheralter
 
-    const LATEST_VERSION: u16 = 5;
+    const LATEST_VERSION: u16 = 1;
 
     loop {
         let user_version: u16 = sqlite.query_row("pragma user_version", [], |row| row.get(0))?;
 
         match user_version {
             0 => sqlite_migrate_0(sqlite)?,
-            1 => sqlite_migrate_1(sqlite)?,
-            2 => sqlite_migrate_2(sqlite)?,
-            3 => sqlite_migrate_3(sqlite)?,
-            4 => sqlite_migrate_4(sqlite)?,
             LATEST_VERSION => break,
             _ => anyhow::bail!(
                 "Database version {user_version} is newer than supported (max: {LATEST_VERSION})"
@@ -292,167 +288,19 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
         create table if not exists reach (
             repo text not null,
             path text not null,
-            time text not null,
-            unique (repo, path, time)
-        ) strict;
-        ",
-        [],
-    )?;
-
-    tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
-
-    tx.commit()?;
-
-    Ok(())
-}
-
-// Put `time` before `path` in the unique index
-fn sqlite_migrate_1(sqlite: &mut Connection) -> anyhow::Result<()> {
-    let tx = sqlite.transaction()?;
-
-    let user_version: u16 = tx.query_row("pragma user_version;", [], |row| row.get(0))?;
-
-    assert_eq!(user_version, 1);
-
-    tx.execute(
-        "
-        create table new_reach (
-            repo text not null,
-            path text not null,
-            time text not null,
-            unique (repo, time, path)
-        ) strict;
-        ",
-        [],
-    )?;
-
-    tx.execute("insert into new_reach select * from reach;", [])?;
-
-    tx.execute("drop table reach;", [])?;
-
-    tx.execute("alter table new_reach rename to reach;", [])?;
-
-    tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
-
-    tx.commit()?;
-
-    Ok(())
-}
-
-// Add `cwd` column. Default to `repo` for historical data. Also enable foreign key enforcement.
-fn sqlite_migrate_2(sqlite: &mut Connection) -> anyhow::Result<()> {
-    sqlite.execute("pragma foreign_keys = off;", [])?;
-
-    let tx = sqlite.transaction()?;
-
-    let user_version: u16 = tx.query_row("pragma user_version;", [], |row| row.get(0))?;
-
-    assert_eq!(user_version, 2);
-
-    tx.execute(
-        "
-        create table new_reach (
-            repo text not null,
-            path text not null,
             cwd text not null,
             time text not null,
-            unique (repo, time, cwd, path)
+            event text,
+            session text
         ) strict;
         ",
         [],
     )?;
 
     tx.execute(
-        "
-        insert into new_reach
-        select
-            repo,
-            path,
-            repo as cwd,
-            time
-        from reach;
-        ",
+        "create index if not exists reach_repo_time_path on reach (repo, time, path);",
         [],
     )?;
-
-    tx.execute("drop table reach;", [])?;
-
-    tx.execute("alter table new_reach rename to reach;", [])?;
-
-    tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
-
-    tx.commit()?;
-
-    sqlite.execute("pragma foreign_keys = on;", [])?;
-
-    Ok(())
-}
-
-// Add nullable `event` column. Default to `null` for historical data. Also replace unique
-// constraint with a non-unique index.
-fn sqlite_migrate_3(sqlite: &mut Connection) -> anyhow::Result<()> {
-    sqlite.execute("pragma foreign_keys = off;", [])?;
-
-    let tx = sqlite.transaction()?;
-
-    let user_version: u16 = tx.query_row("pragma user_version;", [], |row| row.get(0))?;
-
-    assert_eq!(user_version, 3);
-
-    tx.execute(
-        "
-        create table new_reach (
-            repo text not null,
-            path text not null,
-            cwd text not null,
-            time text not null,
-            event text
-        ) strict;
-        ",
-        [],
-    )?;
-
-    tx.execute(
-        "
-        insert into new_reach
-        select
-            repo,
-            path,
-            cwd,
-            time,
-            null as event
-        from reach;
-        ",
-        [],
-    )?;
-
-    tx.execute("drop table reach;", [])?;
-
-    tx.execute("alter table new_reach rename to reach;", [])?;
-
-    tx.execute(
-        "create index reach_repo_time_path on reach (repo, time, path);",
-        [],
-    )?;
-
-    tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
-
-    tx.commit()?;
-
-    sqlite.execute("pragma foreign_keys = on;", [])?;
-
-    Ok(())
-}
-
-// Add nullable `session` column. Default to `null` for historical data.
-fn sqlite_migrate_4(sqlite: &mut Connection) -> anyhow::Result<()> {
-    let tx = sqlite.transaction()?;
-
-    let user_version: u16 = tx.query_row("pragma user_version;", [], |row| row.get(0))?;
-
-    assert_eq!(user_version, 4);
-
-    tx.execute("alter table reach add column session text;", [])?;
 
     tx.execute(&format!("pragma user_version = {};", user_version + 1), [])?;
 
