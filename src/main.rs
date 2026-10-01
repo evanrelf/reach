@@ -17,21 +17,21 @@ use std::{
 #[derive(clap::Parser)]
 #[command(disable_help_subcommand = true)]
 struct Args {
-    /// Run as if started in another Git repo instead of working directory
-    #[arg(long)]
-    repo: Option<Utf8PathBuf>,
+    #[command(subcommand)]
+    command: Command,
 
     /// Path to database
     #[arg(long, env = "REACH_DB", value_name = "PATH")]
     db: Option<Utf8PathBuf>,
 
-    #[command(subcommand)]
-    command: Command,
+    /// Path to Git repo
+    #[arg(long, env = "REACH_REPO")]
+    repo: Option<Utf8PathBuf>,
 }
 
 #[derive(clap::Subcommand)]
 enum Command {
-    /// Record path access
+    /// Record path event
     Record(RecordArgs),
 
     /// Query recorded paths
@@ -40,23 +40,21 @@ enum Command {
 
 #[derive(clap::Args)]
 struct RecordArgs {
-    /// Record as if accessed from a different working directory
+    path: Utf8PathBuf,
+
+    event: EventKind,
+
+    /// Group events from the same session
+    #[arg(long, env = "REACH_SESSION")]
+    session: String,
+
+    /// Record as if occurred from a different working directory
     #[arg(long, value_name = "PATH")]
     cwd: Option<Utf8PathBuf>,
 
-    /// Record as if accessed at a different time
+    /// Record as if occurred at a different time
     #[arg(long, value_parser = parse_timestamp)]
     time: Option<Timestamp>,
-
-    /// Record a specific event
-    #[arg(long, requires = "session")]
-    event: Option<EventKind>,
-
-    /// Group events from the same session
-    #[arg(long)]
-    session: Option<String>,
-
-    path: Utf8PathBuf,
 }
 
 #[derive(clap::Args)]
@@ -155,7 +153,7 @@ fn run_record(sqlite: &Connection, repo: &Utf8Path, args: RecordArgs) -> anyhow:
     // TODO: Allow recording files outside of repo? Need to exclude temporary files like
     // `*.jjdescription` and such.
     if path.starts_with(repo) {
-        record(sqlite, repo, &path, &cwd, &time, event, session.as_deref())?;
+        record(sqlite, repo, &path, &cwd, &time, event, &session)?;
     }
 
     Ok(())
@@ -288,10 +286,10 @@ fn sqlite_migrate_0(sqlite: &mut Connection) -> anyhow::Result<()> {
         create table if not exists file_events (
             repo text not null,
             path text not null,
+            session text not null,
+            event text not null,
             cwd text not null,
-            time text not null,
-            event text,
-            session text
+            time text not null
         ) strict;
         ",
         [],
@@ -418,8 +416,8 @@ fn record(
     path: &Utf8Path,
     cwd: &Utf8Path,
     time: &Timestamp,
-    event: Option<EventKind>,
-    session: Option<&str>,
+    event: EventKind,
+    session: &str,
 ) -> anyhow::Result<()> {
     sqlite.execute(
         "
