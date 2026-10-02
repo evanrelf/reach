@@ -20,11 +20,11 @@ struct Args {
     command: Command,
 
     /// Path to database
-    #[arg(long, env = "REACH_DB", value_name = "PATH")]
+    #[arg(long, env = "REACH_DB", value_name = "FILE")]
     db: Option<Utf8PathBuf>,
 
     /// Path to Git repo
-    #[arg(long, env = "REACH_REPO")]
+    #[arg(long, env = "REACH_REPO", value_name = "DIRECTORY")]
     repo: Option<Utf8PathBuf>,
 }
 
@@ -48,7 +48,7 @@ struct RecordArgs {
     session: String,
 
     /// Record as if occurred from a different working directory
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "DIRECTORY")]
     cwd: Option<Utf8PathBuf>,
 
     /// Record as if occurred at a different time
