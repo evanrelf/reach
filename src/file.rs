@@ -14,10 +14,10 @@ use std::{
 
 #[derive(clap::Subcommand)]
 pub enum Command {
-    /// Record path event
+    /// Record file event
     Record(RecordArgs),
 
-    /// Query recorded paths
+    /// Query file events
     Query(QueryArgs),
 }
 
@@ -46,7 +46,7 @@ pub struct QueryArgs {
     #[arg(long)]
     pub absolute: bool,
 
-    /// Include ignored paths
+    /// Include ignored files
     #[arg(long)]
     pub no_ignore: bool,
 

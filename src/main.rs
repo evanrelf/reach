@@ -1,6 +1,6 @@
-mod files;
+mod file;
 
-use crate::files::{Command, run_query, run_record};
+use crate::file::{Command, run_query, run_record};
 use camino::{Utf8Path, Utf8PathBuf};
 use clap::Parser as _;
 use etcetera::app_strategy::{AppStrategy as _, AppStrategyArgs, Xdg};
